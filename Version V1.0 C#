@@ -1,0 +1,390 @@
+using System;
+using System.IO;
+
+namespace Chances_Football_GH
+{
+    class Program
+    {
+        public static string dir = Directory.GetCurrentDirectory();
+
+        public const double heimvorteilValue = 0.5;
+
+        public static int simulations = 10000;
+
+        public static double xG_1 = 0.0; //Expected Goals Team 1
+        public static double TpS_1 = 0.0; //Tore pro Spiel Team 1
+        public static double GTpS_1 = 0.0; //Gegen Tore pro Spiel Team 1
+        public static bool Heimvorteil_1 = false; //Bonus im durschnitt = + 0.5 Tore
+        public static int EloR_1 = 0; //Elo-Rating Team 1
+
+        public static double xG_2 = 0.0; //Expected Goals Team 2
+        public static double TpS_2 = 0.0; //Tore pro Spiel Team 2
+        public static double GTpS_2 = 0.0; //Gegen Tore pro Spiel Team 2
+        public static bool Heimvorteil_2 = false; //Bonus im durschnitt = + 0.5 Tore
+        public static int EloR_2 = 0; //Elo-Rating Team 2
+
+        public static string aliasTeam_1 = "Team 1";
+        public static string aliasTeam_2 = "Team 2";
+
+        public static double lambda_1 = 0.0;
+        public static double lambda_2 = 0.0;
+
+        static void Main(string[] args)
+        {
+            string input = string.Empty;
+
+            try
+            {
+                //Aliase
+                Console.WriteLine("Name Team 1");
+                aliasTeam_1 = Console.ReadLine();
+
+                Console.WriteLine("\nName Team 2");
+                aliasTeam_2 = Console.ReadLine();
+
+                //Simulationen
+                Console.Clear();
+
+                Console.WriteLine("Number of simulations:");
+                input = Console.ReadLine();
+
+                simulations = int.Parse(input);
+
+                //Team 1
+                Console.Clear();
+
+                Console.WriteLine($"Expected goals per game based on chance quality: ({aliasTeam_1}) (e.g. 1,5)");
+                input = Console.ReadLine();
+
+                xG_1 = double.Parse(input);
+
+                Console.WriteLine($"Average goals per game: ({aliasTeam_1}) (e.g. 1,5)");
+                input = Console.ReadLine();
+
+                TpS_1 = double.Parse(input);
+
+                Console.WriteLine($"Average goals conceded per game: ({aliasTeam_1}) (e.g. 1,5)");
+                input = Console.ReadLine();
+
+                GTpS_1 = double.Parse(input);
+
+                Console.WriteLine($"Home advantage: ({aliasTeam_1}) (true or false)");
+                input = Console.ReadLine();
+
+                Heimvorteil_1 = bool.Parse(input);
+
+                Console.WriteLine($"Elo rating: ({aliasTeam_1}) (e.g. 1500)");
+                input = Console.ReadLine();
+
+                EloR_1 = int.Parse(input);
+
+                Console.Clear();
+
+                //Team2
+                Console.WriteLine($"Expected goals per game based on chance quality: ({aliasTeam_2})");
+                input = Console.ReadLine();
+
+                xG_2 = double.Parse(input);
+
+                Console.WriteLine($"Average goals per game: ({aliasTeam_2})");
+                input = Console.ReadLine();
+
+                TpS_2 = double.Parse(input);
+
+                Console.WriteLine($"Average goals conceded per game: ({aliasTeam_2})");
+                input = Console.ReadLine();
+
+                GTpS_2 = double.Parse(input);
+
+                Console.WriteLine($"Elo rating: ({aliasTeam_2})");
+                input = Console.ReadLine();
+
+                EloR_2 = int.Parse(input);
+
+                if (Heimvorteil_1 == true)
+                {
+                    Heimvorteil_2 = false;
+                }
+                else
+                {
+                    Heimvorteil_2 = true;
+                }
+
+                erwartetToreBerechnen();
+                MCSimulation();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                Console.ReadKey();
+            }
+            finally
+            {
+                Console.ReadKey();
+            }
+        }
+
+        /*
+            <°))))>< 
+        */
+
+        static void erwartetToreBerechnen()
+        {
+            /*
+                Tore Team A pro Spiel + xG Team A − Gegentore Team B pro Spiel
+                --------------------------------------------------------------
+                                               2
+            */
+
+            lambda_1 = (TpS_1 + xG_1 - GTpS_2) / 2;
+            lambda_2 = (TpS_2 + xG_2 - GTpS_1) / 2;
+
+
+            if (Heimvorteil_1 == true)
+            {
+                lambda_1 += heimvorteilValue;
+            }
+            else
+            {
+                lambda_2 += heimvorteilValue;
+            }
+
+            if (EloR_1 > EloR_2)
+            {
+                int eloDif = EloR_1 - EloR_2;
+
+                lambda_1 = lambda_1 * 1 + (eloDif / 400);
+            }
+            else if (EloR_2 > EloR_1)
+            {
+                int eloDif = EloR_2 - EloR_1;
+
+                lambda_2 = lambda_2 * 1 + (eloDif / 400);
+            }
+        }
+
+        static void MCSimulation()
+        {
+            int siege_1 = 0, siege_2 = 0, unentschieden = 0;
+            double fortschritt = 0.0;
+
+            Random rand = new Random();
+
+            //Monte-Carlo-Simulation
+            for (int i = 0; i < simulations; i++)
+            {
+                int tore_1 = PoissonRandom(lambda_1, rand);
+                int tore_2 = PoissonRandom(lambda_2, rand);
+
+                if (tore_1 > tore_2)
+                {
+                    siege_1++;
+                }
+                else if (tore_1 < tore_2)
+                {
+                    siege_2++;
+                }
+                else
+                {
+                    unentschieden++;
+                }
+
+                //Prozent angabe des Fortschritts
+                fortschritt = (i / (double)simulations) * 100;
+
+                if (i % (simulations / 60) == 0)
+                {
+                    Console.Clear();
+                    Console.WriteLine("Calculating...");
+                    Console.WriteLine("Simulation: " + i);
+
+                    if (fortschritt < 30)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                    }
+                    else if (fortschritt >= 30 && fortschritt < 70)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                    }
+
+                    Console.WriteLine($"\nProgress: {fortschritt:F2}%");
+                    Console.ForegroundColor = ConsoleColor.White;
+                }
+            }
+
+            MCdone(siege_1, siege_2, unentschieden);
+        }
+
+        static int PoissonRandom(double lambda, Random rand)
+        {
+            double L = Math.Exp(-lambda);
+            double p = 1.0;
+            int k = 0;
+
+            do
+            {
+                k++;
+                p *= rand.NextDouble();
+            }
+            while (p > L);
+
+            return k - 1;
+        }
+
+        static void MCdone(int siege_1, int siege_2, int unentschieden)
+        {
+            string input = string.Empty;
+
+            bool nochmal = false;
+            bool error = false;
+
+            double difLambda = 0.0;
+            double difXG = 0.0;
+            double difTpS = 0.0;
+            double difGTpS = 0.0;
+            double difEloR = 0.0;
+
+            int ConsoleHeight = Console.WindowHeight;
+            int ConsoleWidth = Console.WindowWidth;
+
+            //Simulation Speichern
+            safeSimulationCSV(unentschieden, siege_1, siege_2);
+
+            Console.Clear();
+            Console.WriteLine($"{aliasTeam_1} wins: {(double)siege_1 / simulations:P2}");
+            Console.WriteLine($"Draw: {(double)unentschieden / simulations:P2}");
+            Console.WriteLine($"{aliasTeam_2} wins: {(double)siege_2 / simulations:P2}");
+
+            Console.WriteLine($"\nSimulations: {simulations}\n");
+
+            //Team 1
+            Console.BackgroundColor = ConsoleColor.White;
+            Console.ForegroundColor = ConsoleColor.Black;
+            Console.Write(aliasTeam_1);
+            Console.BackgroundColor = ConsoleColor.Black;
+            Console.ForegroundColor = ConsoleColor.White;
+
+            if (siege_1 > siege_2)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine(" -- Won");
+                Console.ForegroundColor = ConsoleColor.White;
+            }
+            else if (siege_1 < siege_2)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(" -- Lost");
+                Console.ForegroundColor = ConsoleColor.White;
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine(" -- Draw");
+                Console.ForegroundColor = ConsoleColor.White;
+            }
+
+            Console.WriteLine("\n------------------");
+            Console.WriteLine($"Lambda: {lambda_1}");
+            Console.WriteLine($"xG: {xG_1}");
+            Console.WriteLine($"Goals per game: {TpS_1}");
+            Console.WriteLine($"Goals conceded per game: {GTpS_1}");
+            Console.WriteLine($"Home advantage: {Heimvorteil_1}");
+            Console.WriteLine($"Elo rating: {EloR_1}");
+
+            Console.WriteLine("\n");
+
+            //Team 2
+            Console.BackgroundColor = ConsoleColor.White;
+            Console.ForegroundColor = ConsoleColor.Black;
+            Console.Write(aliasTeam_2);
+            Console.BackgroundColor = ConsoleColor.Black;
+            Console.ForegroundColor = ConsoleColor.White;
+
+            if (siege_1 < siege_2)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine(" -- Won");
+                Console.ForegroundColor = ConsoleColor.White;
+            }
+            else if (siege_1 > siege_2)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(" -- Lost");
+                Console.ForegroundColor = ConsoleColor.White;
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine(" -- Draw");
+                Console.ForegroundColor = ConsoleColor.White;
+            }
+
+            Console.WriteLine("\n------------------");
+            Console.WriteLine($"Lambda: {lambda_2}");
+            Console.WriteLine($"xG: {xG_2}");
+            Console.WriteLine($"Goals per game: {TpS_2}");
+            Console.WriteLine($"Goals conceded per game: {GTpS_2}");
+            Console.WriteLine($"Home advantage: {Heimvorteil_2}");
+            Console.WriteLine($"Elo rating: {EloR_2}");
+
+            //Differenz
+            if (lambda_1 > lambda_2) difLambda = lambda_1 - lambda_2;
+            else difLambda = lambda_2 - lambda_1;
+
+            if (xG_1 > xG_2) difXG = xG_1 - xG_2;
+            else difXG = xG_2 - xG_1;
+
+            if (TpS_1 > TpS_2) difTpS = TpS_1 - TpS_2;
+            else difTpS = TpS_2 - TpS_1;
+
+            if (GTpS_1 > GTpS_2) difGTpS = GTpS_1 - GTpS_2;
+            else difGTpS = GTpS_2 - GTpS_1;
+
+            if (EloR_1 > EloR_2) difEloR = EloR_1 - EloR_2;
+            else difEloR = EloR_2 - EloR_1;
+
+            Console.BackgroundColor = ConsoleColor.White;
+            Console.ForegroundColor = ConsoleColor.Black;
+            Console.WriteLine($"\nDifference between {aliasTeam_1} and {aliasTeam_2}\n");
+            Console.BackgroundColor = ConsoleColor.Black;
+            Console.ForegroundColor = ConsoleColor.White;
+
+            Console.WriteLine($"Lambda: {difLambda}");
+            Console.WriteLine($"xG: {difXG}");
+            Console.WriteLine($"Goals per game: {difTpS}");
+            Console.WriteLine($"Goals conceded per game: {difGTpS}");
+            Console.WriteLine($"Elo rating: {difEloR}");
+        }
+
+        static void safeSimulationCSV(double unentschieden, double siege_1, double siege_2)
+        {
+            string filename = string.Empty;
+
+            if (Directory.Exists(dir + @"\Simulations") == false)
+            {
+                Directory.CreateDirectory(dir + @"\Simulations");
+            }
+
+            filename = @"Simulations\" + aliasTeam_1 + "_vs_" + aliasTeam_2 + "--" + DateTime.Now.ToString("mm-HH--dd-MM-yyyy") + ".csv";
+
+            File.Create(filename).Close();
+
+            using (StreamWriter writer = new StreamWriter(filename, true))
+            {
+                writer.WriteLine($" ;{aliasTeam_1};{aliasTeam_2}");
+                writer.WriteLine($"Lambda;{lambda_1};{lambda_2}");
+                writer.WriteLine($"xG;{xG_1};{xG_2}");
+                writer.WriteLine($"Goals per game;{TpS_1};{TpS_2}");
+                writer.WriteLine($"Goals conceded per game;{GTpS_1};{GTpS_2}");
+                writer.WriteLine($"Home advantage;{Heimvorteil_1};{Heimvorteil_2}");
+                writer.WriteLine($"Elo rating;{EloR_1};{EloR_2}");
+                writer.WriteLine($"{(double)unentschieden / simulations:P2};{(double)siege_1 / simulations:P2};{(double)siege_2 / simulations:P2}");
+                writer.WriteLine($"Simulations;;;{simulations}");
+            }
+        }
+    }
+}
